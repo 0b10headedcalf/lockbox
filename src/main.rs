@@ -1,7 +1,6 @@
 //for debugging
 #![allow(warnings)]
 
-
 use core::fmt;
 use std::ffi::c_void;
 use std::fs::File;
@@ -16,7 +15,7 @@ use resend_rs::{Resend, Result};
 
 //CLI Setup
 #[derive(Parser)]
-#[command(name = "lockbox", about = "lock a file", version)]
+#[command(name = "lockbox", about = "Lock a file and hand off the ability to unlock it to someone else.", version)]
 struct Cli{
 
     #[command(subcommand)]
@@ -48,7 +47,7 @@ enum Commands{
 
 // mail protocol
 #[tokio::main]
-async fn send_email(config: String, message_key: &str, nonce: i32) -> Result<()>{
+async fn send_email(config: String, message_key: String, nonce: String) -> Result<()>{
     let parsed_config = config.parse::<Table>().unwrap();
     let api_key = parsed_config["mail"]["RESEND_KEY"].as_str().unwrap();
     let recipient = parsed_config["addresses"]["recipient"].as_str().unwrap();
@@ -80,8 +79,10 @@ fn generate_key() -> [u8;32]{
     return key; 
 }
 
-fn encode_hex(key: [u8;32]) -> String{
-    todo!();
+fn generate_nonce() -> [u8;12]{    
+    let mut nonce = [0u8;12];
+    rand::fill(&mut nonce);
+    return nonce;
 }
 
 fn encrypt_target(target:PathBuf, key:[u8;32]){
@@ -103,7 +104,11 @@ fn main() {
     let config = std::fs::read_to_string("config.toml")
         .expect("config not found");
     
-    send_email(config, message_key, nonce);
+    let message_key = hex::encode(generate_key());
+    let nonce = generate_nonce();
+    println!("Key: {}", message_key);
+    println!("Nonce: {:?}", nonce);
+    // send_email(config, message_key, nonce);
     
     // let cli = Cli::parse();
     //
