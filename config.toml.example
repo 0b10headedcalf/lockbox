@@ -1,5 +1,3 @@
 [mail]
 RESEND_KEY = RESEND_API_KEY
 
-[addresses]
-recipient = "recipient@mail.com"

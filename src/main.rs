@@ -1,4 +1,4 @@
-//for debugging
+//debug
 #![allow(warnings)]
 
 use core::fmt;
@@ -30,6 +30,8 @@ enum Commands{
     Lock{
         #[arg(short,long)]
         target: PathBuf,
+        #[arg(short,long)]
+        recipient: String
 
     },
     Unlock{
@@ -47,10 +49,9 @@ enum Commands{
 
 // mail protocol
 #[tokio::main]
-async fn send_email(config: String, message_key: String, nonce: String) -> Result<()>{
+async fn send_email(config: String, message_key: String, nonce: String, recipient: String) -> Result<()>{
     let parsed_config = config.parse::<Table>().unwrap();
     let api_key = parsed_config["mail"]["RESEND_KEY"].as_str().unwrap();
-    let recipient = parsed_config["addresses"]["recipient"].as_str().unwrap();
 
     let subject = "Lockbox Key";
     let body = format!(
@@ -67,7 +68,6 @@ async fn send_email(config: String, message_key: String, nonce: String) -> Resul
         .with_text(&body);
 
     let _email = resend.emails.send(email).await?;
-    println!("{:?}",_email);
 
     Ok(())
 }
@@ -85,16 +85,13 @@ fn generate_nonce() -> [u8;12]{
     return nonce;
 }
 
-fn encrypt_target(target:PathBuf, key:[u8;32]){
-    todo!();
-}
 
-fn lock_target(target:PathBuf){
+fn lock(target:PathBuf, key:[u8;32]){
     println!("locking {:#?}",target);
     todo!();
 }
 
-fn unlock_target(target:PathBuf, key: String){
+fn unlock(target:PathBuf, key: String){
     println!("Unlocking {:#?}",target);
     todo!();
 }
@@ -105,21 +102,19 @@ fn main() {
         .expect("config not found");
     
     let message_key = hex::encode(generate_key());
-    let nonce = generate_nonce();
-    println!("Key: {}", message_key);
-    println!("Nonce: {:?}", nonce);
-    // send_email(config, message_key, nonce);
+    let nonce = hex::encode(generate_nonce());
     
-    // let cli = Cli::parse();
-    //
-    // match cli.command{
-    //     Commands::Lock{target} => {
-    //         lock_target(target);
-    //     }
-    //     Commands::Unlock { target, key } => {
-    //         unlock_target(target, key);
-    //     }
-    // }
+    let cli = Cli::parse();
+
+    match cli.command{
+        Commands::Lock{target, recipient} => {
+            send_email(config, message_key, nonce, recipient);
+            lock_target(target);
+        }
+        Commands::Unlock { target, key } => {
+            unlock_target(target, key);
+        }
+    }
     
 
 }
