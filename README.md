@@ -1,13 +1,13 @@
 # Lockbox
 
-                                               
+<pre align="center>                                               
   ▄▄▄                                          
  ▀██▀                        █▄                
   ██                  ▄▄     ██                
   ██      ▄███▄ ▄███▀ ██ ▄█▀ ████▄ ▄███▄▀██ ██▀
   ██      ██ ██ ██    ████   ██ ██ ██ ██  ███  
  ████████▄▀███▀▄▀███▄▄██ ▀█▄▄████▀▄▀███▀▄██ ██▄
-                                               
+</pre>                            
                                                
 
 Encrypt a file with AES-256-GCM and email the key + nonce to a recipient. The file is then deleted and key+nonce zeroed in memory. The onus is then on the recipient to provide you with the ability to decrypt your file. Currently supports markdown as format as this tool was originally intended to stop myself from accessing and ruminating over old letters/files in my Obsidian vaults.
