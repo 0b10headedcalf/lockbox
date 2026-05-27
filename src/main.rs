@@ -2,16 +2,16 @@
 #![allow(warnings)]
 
 use core::fmt;
-use std::ffi::c_void;
-use std::fs::File;
-use std::io::Read;
-use std::path::{PathBuf};
+use std::fmt::format;
+use std::{fs, vec};
+use std::path::{Path,PathBuf};
+use aes_gcm::aes::cipher;
 use toml::Table;
-// use aes_gcm::{Aes256Gcm, Key, KeyInit, Nonce, aead::Aead};
+use aes_gcm::{Aes256Gcm, Key, KeyInit, Nonce, aead::Aead};
 use clap::{Parser, Subcommand};
-// use aes_gcm::aead;
 use resend_rs::types::CreateEmailBaseOptions;
 use resend_rs::{Resend, Result};
+use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
 
 //CLI Setup
 #[derive(Parser)]
@@ -37,7 +37,8 @@ enum Commands{
     Unlock{
         #[arg(short,long)]
         target: PathBuf,
-        key: String
+        key: String,
+        u_nonce: String
 
     },
     
@@ -86,33 +87,59 @@ fn generate_nonce() -> [u8;12]{
 }
 
 
-fn lock(target:PathBuf, key:[u8;32]){
+fn lock(target:PathBuf, key:&[u8;32], nonce_bytes:&[u8;12]) -> std::io::Result<()>{
     println!("locking {:#?}",target);
-    todo!();
+    let data = fs::read(&target)?;
+    let mut newPath = PathBuf::from(target);
+    newPath.set_extension("lckbx");
+    let cipher = Aes256Gcm::new(key.into());
+    let encrypted_file = cipher
+        .encrypt(nonce_bytes.into(), data.as_ref())
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?;
+    fs::write(newPath, encrypted_file)?;
+    
+    Ok(())
 }
 
-fn unlock(target:PathBuf, key: String){
+fn unlock(target:PathBuf, key_str: String, nonce_str: String) -> std::io::Result<()>{
     println!("Unlocking {:#?}",target);
-    todo!();
-}
+    let data = fs::read(&target)?;
+    let mut newPath = PathBuf::from(target);
+    newPath.set_extension("md");
+    let mut key_bytes = [0u8;32];
+    let mut nonce_bytes = [0u8;12];
+    hex::decode_to_slice(key_str, &mut key_bytes);
+    hex::decode_to_slice(nonce_str, &mut nonce_bytes);
+    let cipher = Aes256Gcm::new(&key_bytes.into());
 
+    let decrypted_file = cipher
+        .decrypt(&nonce_bytes.into(), data.as_ref())
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?;
+
+    fs::write(newPath, decrypted_file)?;
+    Ok(())
+}
 
 fn main() {
     let config = std::fs::read_to_string("config.toml")
         .expect("config not found");
     
-    let message_key = hex::encode(generate_key());
-    let nonce = hex::encode(generate_nonce());
+    let mut message_key = generate_key();
+    let mut nonce = generate_nonce();
     
     let cli = Cli::parse();
 
     match cli.command{
         Commands::Lock{target, recipient} => {
-            send_email(config, message_key, nonce, recipient);
-            lock_target(target);
+            lock(target, &message_key, &nonce);
+            println!("{:?}\n{:?}",message_key,hex::encode(message_key));
+            println!("nonce:{:?}", hex::encode(nonce));
+            message_key.zeroize();
+            nonce.zeroize();
+            // send_email(config, hex::encode(message_key), hex::encode(nonce), recipient);
         }
-        Commands::Unlock { target, key } => {
-            unlock_target(target, key);
+        Commands::Unlock { target, key, u_nonce} => {
+            unlock(target, key, u_nonce);
         }
     }
     
