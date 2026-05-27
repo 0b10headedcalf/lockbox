@@ -1,17 +1,13 @@
 //debug
-#![allow(warnings)]
-
-use core::fmt;
-use std::fmt::format;
-use std::{fs, vec};
-use std::path::{Path,PathBuf};
-use aes_gcm::aes::cipher;
+// #![allow(warnings)]
+use std::{fs};
+use std::path::{PathBuf};
 use toml::Table;
-use aes_gcm::{Aes256Gcm, Key, KeyInit, Nonce, aead::Aead};
+use aes_gcm::{Aes256Gcm,KeyInit, aead::Aead};
 use clap::{Parser, Subcommand};
 use resend_rs::types::CreateEmailBaseOptions;
 use resend_rs::{Resend, Result};
-use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
+use zeroize::{Zeroize};
 
 //CLI Setup
 #[derive(Parser)]
@@ -90,33 +86,36 @@ fn generate_nonce() -> [u8;12]{
 fn lock(target:PathBuf, key:&[u8;32], nonce_bytes:&[u8;12]) -> std::io::Result<()>{
     println!("locking {:#?}",target);
     let data = fs::read(&target)?;
-    let mut newPath = PathBuf::from(target);
-    newPath.set_extension("lckbx");
+    let mut new_path = PathBuf::from(target);
+    new_path.set_extension("lckbx");
     let cipher = Aes256Gcm::new(key.into());
     let encrypted_file = cipher
         .encrypt(nonce_bytes.into(), data.as_ref())
         .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?;
-    fs::write(newPath, encrypted_file)?;
     
+    println!("Encryption of {:?} succesful!", new_path);
+    fs::write(new_path, encrypted_file)?;
+
     Ok(())
 }
 
 fn unlock(target:PathBuf, key_str: String, nonce_str: String) -> std::io::Result<()>{
     println!("Unlocking {:#?}",target);
     let data = fs::read(&target)?;
-    let mut newPath = PathBuf::from(target);
-    newPath.set_extension("md");
+    let mut new_path = PathBuf::from(target);
+    new_path.set_extension("md");
     let mut key_bytes = [0u8;32];
     let mut nonce_bytes = [0u8;12];
-    hex::decode_to_slice(key_str, &mut key_bytes);
-    hex::decode_to_slice(nonce_str, &mut nonce_bytes);
+    hex::decode_to_slice(key_str, &mut key_bytes).ok();
+    hex::decode_to_slice(nonce_str, &mut nonce_bytes).ok();
     let cipher = Aes256Gcm::new(&key_bytes.into());
 
     let decrypted_file = cipher
         .decrypt(&nonce_bytes.into(), data.as_ref())
         .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?;
 
-    fs::write(newPath, decrypted_file)?;
+    println!("Decryption of {:?} succesful!", new_path);
+    fs::write(new_path, decrypted_file)?;
     Ok(())
 }
 
@@ -131,15 +130,13 @@ fn main() {
 
     match cli.command{
         Commands::Lock{target, recipient} => {
-            lock(target, &message_key, &nonce);
-            println!("{:?}\n{:?}",message_key,hex::encode(message_key));
-            println!("nonce:{:?}", hex::encode(nonce));
+            lock(target, &message_key, &nonce).ok();
+            send_email(config, hex::encode(message_key), hex::encode(nonce), recipient).ok();
             message_key.zeroize();
             nonce.zeroize();
-            // send_email(config, hex::encode(message_key), hex::encode(nonce), recipient);
         }
         Commands::Unlock { target, key, u_nonce} => {
-            unlock(target, key, u_nonce);
+            unlock(target, key, u_nonce).ok();
         }
     }
     
