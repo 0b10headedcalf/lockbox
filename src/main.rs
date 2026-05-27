@@ -86,16 +86,16 @@ fn generate_nonce() -> [u8;12]{
 fn lock(target:PathBuf, key:&[u8;32], nonce_bytes:&[u8;12]) -> std::io::Result<()>{
     println!("locking {:#?}",target);
     let data = fs::read(&target)?;
-    let mut new_path = PathBuf::from(target);
+    let mut new_path = PathBuf::from(&target);
     new_path.set_extension("lckbx");
     let cipher = Aes256Gcm::new(key.into());
     let encrypted_file = cipher
         .encrypt(nonce_bytes.into(), data.as_ref())
         .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?;
     
-    println!("Encryption of {:?} succesful!", new_path);
+    println!("Encryption of {:?} succesful!", target);
     fs::write(new_path, encrypted_file)?;
-
+    fs::remove_file(target)?;
     Ok(())
 }
 
